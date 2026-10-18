@@ -30,7 +30,23 @@ export const constants = {
 
     moveLightsWorkgroupSize: 128,
 
-    lightRadius: 2
+    // clusterLightsWorkgroupSize: 128,
+    clusterLightsWorkgroupSizeX: 4,
+    clusterLightsWorkgroupSizeY: 4,
+    clusterLightsWorkgroupSizeZ: 4,
+
+    lightRadius: 2,
+
+    maxLightsPerCluster: 128,
+    xClusterCnt: 32,
+    yClusterCnt: 32,
+    zClusterCnt: 32,
+
+    cluster_far_clip: 100, // temporarily override camera.farClip
+    logSlicing: 0, // z slicing: 0 = linear, 1 = log
+
+    // forward+ debug view: 0 = off, 1 = cluster index, 2 = light count, 3 = full clusters in red
+    debugView: 0
 };
 
 // =================================

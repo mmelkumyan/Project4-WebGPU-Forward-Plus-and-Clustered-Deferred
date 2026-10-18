@@ -14,3 +14,74 @@
 //     Add the calculated contribution to the total light accumulation.
 // Multiply the fragment’s diffuse color by the accumulated light contribution.
 // Return the final color, ensuring that the alpha component is set appropriately (typically to 1).
+
+@group(${bindGroup_scene}) @binding(0) var<uniform> camera: CameraUniforms;
+@group(${bindGroup_scene}) @binding(1) var<storage, read> lightSet: LightSet;
+@group(${bindGroup_scene}) @binding(2) var<storage, read> clusterSet: ClusterSet;
+
+@group(${bindGroup_material}) @binding(0) var diffuseTex: texture_2d<f32>;
+@group(${bindGroup_material}) @binding(1) var diffuseTexSampler: sampler;
+
+struct FragmentInput
+{
+    @builtin(position) fragPos: vec4f, // xy in pixels
+    @location(0) pos: vec3f,
+    @location(1) nor: vec3f,
+    @location(2) uv: vec2f
+}
+
+@fragment
+fn main(in: FragmentInput) -> @location(0) vec4f
+{
+    let diffuseColor = textureSample(diffuseTex, diffuseTexSampler, in.uv);
+    if (diffuseColor.a < 0.5f) {
+        discard;
+    }
+
+    // --- INDEX CLUSTERSET ---
+    // Get depth in view space
+    let viewDepth = -(camera.viewMat * vec4f(in.pos, 1.f)).z;
+    
+    // Get index into clusterSet.clusters
+    let tx = in.fragPos.x / camera.resolution.x; // [0,1]
+    let ty = (camera.resolution.y - in.fragPos.y) / camera.resolution.y; // [0,1]
+    var tz = (viewDepth - camera.nearClip) / (${cluster_far_clip} - camera.nearClip); // [0,1]
+    if (${logSlicing} == 1) {
+        tz = log(viewDepth / camera.nearClip) / log(${cluster_far_clip} / camera.nearClip);
+    }
+
+    let cx = u32(floor(tx * ${xClusterCnt}));
+    let cy = u32(floor(ty * ${yClusterCnt}));
+    let cz = min(u32(floor(tz * ${zClusterCnt})), ${zClusterCnt} - 1u);
+
+    let clusterIdx = cz * ${xClusterCnt} * ${yClusterCnt} + cy * ${xClusterCnt} + cx;
+
+    let lightCnt = clusterSet.clusters[clusterIdx].numLights;
+
+    // --- DEBUG VIEWS ---
+    switch (${debugView}) {
+        case 1: {
+            return vec4f(f32(cx) / ${xClusterCnt}, f32(cy) / ${yClusterCnt}, f32(cz) / ${zClusterCnt}, 1.f);
+        }
+        case 2: {
+            return vec4f(vec3f(f32(lightCnt) / f32(${maxLightsPerCluster})), 1.f);
+        }
+        case 3: {
+            if (lightCnt >= ${maxLightsPerCluster}) {
+                return vec4f(1.f, 0.f, 0.f, 1.f);
+            }
+        }
+        default: {}
+    }
+
+    // --- SHADING ---
+    var totalLightContrib = vec3f(0, 0, 0);
+    for (var i = 0u; i < lightCnt; i++) {
+        let lightIdx = clusterSet.clusters[clusterIdx].lightsIdx[i];
+        let light = lightSet.lights[lightIdx];
+        totalLightContrib += calculateLightContrib(light, in.pos, normalize(in.nor));
+    }
+
+    var finalColor = diffuseColor.rgb * totalLightContrib;
+    return vec4(finalColor, 1);
+}
