@@ -45,3 +45,23 @@ fn calculateLightContrib(light: Light, posWorld: vec3f, nor: vec3f) -> vec3f {
     let lambert = max(dot(nor, normalize(vecToLight)), 0.f);
     return light.color * lambert * rangeAttenuation(distToLight);
 }
+
+fn getClusterIndices(fragPos: vec2f, viewDepth: f32, camera: CameraUniforms) -> vec3u {
+    // Get index into clusterSet.clusters
+    let tx = fragPos.x / camera.resolution.x; // [0,1]
+    let ty = (camera.resolution.y - fragPos.y) / camera.resolution.y; // [0,1]
+    var tz = (viewDepth - camera.nearClip) / (${cluster_far_clip} - camera.nearClip); // [0,1]
+    if (${logSlicing} == 1) {
+        tz = log(viewDepth / camera.nearClip) / log(${cluster_far_clip} / camera.nearClip);
+    }
+
+    // [0, nClusterCnt]
+    let cx = u32(floor(tx * ${xClusterCnt}));
+    let cy = u32(floor(ty * ${yClusterCnt}));
+    let cz = min(u32(floor(tz * ${zClusterCnt})), ${zClusterCnt} - 1u);
+    return vec3u(cx, cy, cz);
+}
+
+fn getClusterIndex(cx: u32, cy: u32, cz: u32) -> u32 {
+    return cz * ${xClusterCnt} * ${yClusterCnt} + cy * ${xClusterCnt} + cx;
+}

@@ -43,25 +43,15 @@ fn main(in: FragmentInput) -> @location(0) vec4f
     let viewDepth = -(camera.viewMat * vec4f(in.pos, 1.f)).z;
     
     // Get index into clusterSet.clusters
-    let tx = in.fragPos.x / camera.resolution.x; // [0,1]
-    let ty = (camera.resolution.y - in.fragPos.y) / camera.resolution.y; // [0,1]
-    var tz = (viewDepth - camera.nearClip) / (${cluster_far_clip} - camera.nearClip); // [0,1]
-    if (${logSlicing} == 1) {
-        tz = log(viewDepth / camera.nearClip) / log(${cluster_far_clip} / camera.nearClip);
-    }
-
-    let cx = u32(floor(tx * ${xClusterCnt}));
-    let cy = u32(floor(ty * ${yClusterCnt}));
-    let cz = min(u32(floor(tz * ${zClusterCnt})), ${zClusterCnt} - 1u);
-
-    let clusterIdx = cz * ${xClusterCnt} * ${yClusterCnt} + cy * ${xClusterCnt} + cx;
+    let cN: vec3u = getClusterIndices(in.fragPos.xy, viewDepth, camera);
+    let clusterIdx = getClusterIndex(cN.x, cN.y, cN.z);
 
     let lightCnt = clusterSet.clusters[clusterIdx].numLights;
 
     // --- DEBUG VIEWS ---
     switch (${debugView}) {
         case 1: {
-            return vec4f(f32(cx) / ${xClusterCnt}, f32(cy) / ${yClusterCnt}, f32(cz) / ${zClusterCnt}, 1.f);
+            return vec4f(f32(cN.x) / ${xClusterCnt}, f32(cN.y) / ${yClusterCnt}, f32(cN.z) / ${zClusterCnt}, 1.f);
         }
         case 2: {
             return vec4f(vec3f(f32(lightCnt) / f32(${maxLightsPerCluster})), 1.f);
