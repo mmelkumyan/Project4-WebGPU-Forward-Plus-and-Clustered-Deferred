@@ -53,7 +53,7 @@ export const constants = {
 // =================================
 
 function evalShaderRaw(raw: string) {
-    return eval('`' + raw.replaceAll('${', '${constants.') + '`');
+    return raw.replace(/\$\{(\w+)\}/g, (_, key) => String((constants as any)[key]));
 }
 
 const commonSrc: string = evalShaderRaw(commonRaw);
